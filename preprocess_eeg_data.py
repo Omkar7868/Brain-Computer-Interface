@@ -23,26 +23,25 @@ def filter_eeg_data(raw, l_freq, h_freq, filter_type='iir', filter_order=5, notc
     return raw_filtered
 
 
-def create_mne_object(rootpath, data_file_name):
+def create_mne_object(data_file_path):
 
     ## Read data frame from the parquest file ##
-    data_file = os.path.join(rootpath, data_file_name)
-    data_df = pd.read_parquet(data_file)
+    data_df = pd.read_parquet(data_file_path)
 
     ## Creating mne Objects ##
 
     # set info for mne raw object
     sfreq = 250
-    ch_type = ['eeg']
     ch_names = ['O1', 'O2', 'T3', 'T4']
-    info = mne.create_info(s_freq=sfreq, ch_names=ch_names, ch_type=ch_type)
+    ch_type = ['eeg'] * len(ch_names)
+    info = mne.create_info(sfreq=sfreq, ch_names=ch_names, ch_types=ch_type)
 
     # set montage
     montage = mne.channels.make_standard_montage('standard_1020')
 
     # read eeg data from dataframe
-    eeg_data = data_df.dropna(subset=['o1', 'o2', 'o3', 'o4']).copy()
-    raw_data = eeg_data[['o1', 'o2', 't3', 't4']]
+    eeg_data = data_df.dropna(subset=['o1', 'o2', 't3', 't4']).copy()
+    raw_data = eeg_data[['o1', 'o2', 't3', 't4']].T
 
     # create raw mne object
     raw = mne.io.RawArray(raw_data, info)
@@ -62,19 +61,19 @@ def create_mne_object(rootpath, data_file_name):
     # creating mne events structure
     events = np.column_stack((valid_event_indices,
                               np.zeros(len(valid_event_indices)),
-                              valid_events['event_id'].astype(int)
-                              ))
+                              valid_events['event_id']
+                              )).astype(int)
+
+    print(f'Number of EEG channels {raw.get_data().shape[0]}')
+    print(f'Number of time points {raw.get_data().shape[1]}')
 
     return raw, events
 
 
-def create_eeg_segments(eeg_raw_data, events):
-
-    # Define event dictionary (map event_ids to stimuli names)
-    event_id = {'Standard': 1, 'Odd': 2}
+def create_eeg_segments(eeg_raw_data, events, event_id, t_min, t_max ):
 
     # Create epochs from raw data and events
-    epochs = mne.Epochs(raw=eeg_raw_data, events=events, event_id=event_id, tmin=-0.2, tmax=0.8, preload=True)
+    epochs = mne.Epochs(raw=eeg_raw_data, events=events, event_id=event_id, tmin=t_min, tmax=t_max, preload=True)
 
     return epochs
 
