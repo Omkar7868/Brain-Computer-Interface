@@ -2,6 +2,7 @@ import mne
 import pandas as pd
 import numpy as np
 import os
+import asrpy
 
 
 # Filter EEG data
@@ -21,6 +22,14 @@ def filter_eeg_data(raw, l_freq, h_freq, filter_type='iir', filter_order=5, notc
         pass
 
     return raw_filtered
+
+
+# apply automatic artifact subspace reconstruction to repaid or reject bad epochs
+def apply_asr(raw, cutoff):
+    asr = asrpy.ASR(sfreq=raw.info['sfreq'], cutoff=cutoff)
+    asr.fit(raw)
+    raw_asr = asr.transform(raw)
+    return raw_asr
 
 
 def create_mne_object(data_file_path):
@@ -70,13 +79,23 @@ def create_mne_object(data_file_path):
     return raw, events
 
 
-def create_eeg_segments(eeg_raw_data, events, event_id, t_min, t_max ):
-
-    # Create epochs from raw data and events
-    epochs = mne.Epochs(raw=eeg_raw_data, events=events, event_id=event_id, tmin=t_min, tmax=t_max, preload=True)
+def create_eeg_segments(eeg_raw_data, events, event_id, t_min, t_max, rejection_thresh=None):
+    if rejection_thresh is not None:
+        epochs = mne.Epochs(raw=eeg_raw_data,
+                            events=events,
+                            event_id=event_id,
+                            tmin=t_min,
+                            baseline=(-0.2, 0),
+                            tmax=t_max,
+                            preload=True,
+                            reject=dict(eeg=rejection_thresh))
+    else:
+        epochs = mne.Epochs(raw=eeg_raw_data,
+                            events=events,
+                            event_id=event_id,
+                            tmin=t_min,
+                            baseline=(-0.2, 0),
+                            tmax=t_max,
+                            preload=True)
 
     return epochs
-
-
-
-
